@@ -1,4 +1,4 @@
-using ApiGestionMaquinasVirtuales.Models;
+ï»¿using ApiGestionMaquinasVirtuales.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -6,20 +6,17 @@ using ApiGestionMaquinasVirtuales.Interfaces;
 using ApiGestionMaquinasVirtuales.Services;
 using ApiGestionMaquinasVirtuales.Repositories;
 using ApiGestionMaquinasVirtuales.Hubs;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de la base de datos
+// ---------- CONFIGURACIÃ“N DE SERVICIOS ----------
+
+// Base de datos
 builder.Services.AddDbContext<GestionmvContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("connectionDB")));
 
-// Configuración de los servicios de la API
-builder.Services.AddControllers();
-
-// Registrar SignalR
-builder.Services.AddSignalR();
-
-// Registrar servicios personalizados
+// Servicios propios
 builder.Services.AddScoped<IMaquinaVirtualRepository, MaquinaVirtualRepository>();
 builder.Services.AddScoped<MaquinasVirtualesHubService>();
 builder.Services.AddScoped<IMaquinaVirtualService, MaquinaVirtualService>();
@@ -27,26 +24,27 @@ builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+// Controladores y documentaciÃ³n
+builder.Services.AddControllers();
+builder.Services.AddSwaggerGen();
 
-// Configuración de CORS
+// SignalR
+builder.Services.AddSignalR();
+
+// CORS
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllOrigins", policy =>
     {
-        // Permite solicitudes desde cualquier origen, pero puedes restringirlo a uno específico para mayor seguridad
-        policy
-            .WithOrigins(allowedOrigins) // Asegúrate de que la URL de tu frontend esté aquí
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials(); // Específicamente necesario para SignalR
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
-// Configuración de Swagger para documentación de la API
-builder.Services.AddSwaggerGen();
-
-// Configuración de autenticación JWT
+// AutenticaciÃ³n JWT
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
@@ -61,7 +59,6 @@ builder.Services.AddAuthentication("Bearer")
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
         };
 
-        // Configurar SignalR para usar tokens JWT
         options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -69,7 +66,6 @@ builder.Services.AddAuthentication("Bearer")
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
 
-                // Asegúrate de que el path y el token estén correctos para SignalR
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/maquinasVirtualesHub"))
                 {
                     context.Token = accessToken;
@@ -79,16 +75,18 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
-// Configurar políticas de autorización basadas en roles
+// AutorizaciÃ³n por roles
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Administrador"));
     options.AddPolicy("RequireClientRole", policy => policy.RequireRole("Cliente"));
 });
 
+// ---------- CONFIGURACIÃ“N DE MIDDLEWARES ----------
+
 var app = builder.Build();
 
-// Middleware de manejo de excepciones global
+// Manejo global de excepciones
 app.UseExceptionHandler(appError =>
 {
     appError.Run(async context =>
@@ -97,43 +95,38 @@ app.UseExceptionHandler(appError =>
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
         {
-            message = "Ocurrió un error interno. Por favor, inténtelo más tarde."
+            message = "OcurriÃ³ un error interno. Por favor, intÃ©ntelo mÃ¡s tarde."
         }));
     });
 });
 
-// Habilitar CORS
-app.UseCors("AllowAllOrigins");
-
-// Configuración de la redirección a Swagger en la raíz
+// RedirecciÃ³n a Swagger desde la raÃ­z
 app.MapGet("/", (HttpContext context) =>
 {
     context.Response.Redirect("/swagger/index.html", permanent: false);
 });
 
-// Configuración del pipeline de solicitudes
+// Swagger solo en desarrollo
 if (app.Environment.IsDevelopment())
 {
-    // Habilita Swagger solo en el entorno de desarrollo
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHttpsRedirection(); // RedirecciÃ³n HTTP â†’ HTTPS solo en producciÃ³n
+}
 
-// Habilita la autenticación y autorización
+// Middleware de CORS, autenticaciÃ³n y autorizaciÃ³n
+app.UseCors("AllowAllOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Redirección de HTTP a HTTPS en entornos de producción
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
-
-// Configuración de los controladores
+// Controladores
 app.MapControllers();
 
-// Mapear el hub de SignalR
-app.MapHub<MaquinasVirtualesHub>("/maquinasVirtualesHub");
+// SignalR (con polÃ­tica CORS)
+app.MapHub<MaquinasVirtualesHub>("/maquinasVirtualesHub").RequireCors("AllowAllOrigins");
 
-// Ejecuta la aplicación
+// Ejecutar aplicaciÃ³n
 app.Run();
