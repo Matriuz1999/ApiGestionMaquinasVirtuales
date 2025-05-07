@@ -21,7 +21,7 @@ API RESTful desarrollada en .NET Core 9 para la gestión de máquinas virtuales 
 
 1. Clonar el repositorio
    ```
-   git clone https://github.com/your-username/api-gestion-maquinas-virtuales.git
+https://github.com/Matriuz1999/ApiGestionMaquinasVirtuales.git
    cd api-gestion-maquinas-virtuales
    ```
 
