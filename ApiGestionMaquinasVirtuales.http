@@ -1,0 +1,6 @@
+@ApiGestionMaquinasVirtuales_HostAddress = http://localhost:5296
+
+GET {{ApiGestionMaquinasVirtuales_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
