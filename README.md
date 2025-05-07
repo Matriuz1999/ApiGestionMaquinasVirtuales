@@ -82,6 +82,3 @@ API RESTful desarrollada en .NET Core 9 para la gestión de máquinas virtuales 
 
 El proyecto incluye un hub SignalR que permite recibir notificaciones en tiempo real cuando se crean, actualizan o eliminan máquinas virtuales.
 
-## Licencia
-
-[MIT](LICENSE)
